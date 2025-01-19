@@ -1,8 +1,7 @@
 import boto3
 import os
 import json
-from io import BytesIO
-# import face_recognition
+import cv2
 
 PHOTOS_BUCKET_NAME = os.getenv('PHOTOS_BUCKET_NAME')
 QUEUE_URL = os.getenv('QUEUE_URL')
@@ -27,15 +26,28 @@ sqs = boto3.client(
 def handler(event, context):
     for record in event['messages']:
         object_key = record['details']['object_id']
+        response = s3.get_object(Bucket=PHOTOS_BUCKET_NAME, Key=object_key)
+        image_data = response['Body'].read()
 
-        # response = s3.get_object(Bucket=BUCKET_NAME, Key=object_key)
-        # image = face_recognition.load_image_file(BytesIO(response['Body'].read()))
+        local_image_path = f'/tmp/{object_key}'
+        with open(local_image_path, 'wb') as f:
+            f.write(image_data)
+            
+        image = cv2.imread(local_image_path)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        # face_locations = face_recognition.face_locations(image)
-        # for face in face_locations:
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+        face_coordinates = []
+        
+        if list(faces):
+            faces = list(faces)[0]
+            x, y, w, h = faces
+            face_coordinates = [int(x), int(y), int(x + w), int(y + h)]
+            
         task = {
             'original_photo_key': object_key,
-            'face_coordinates': [0, 0, 0, 0],
+            'face_coordinates': face_coordinates,
         }
         sqs.send_message(QueueUrl=QUEUE_URL, MessageBody=json.dumps(task))
 

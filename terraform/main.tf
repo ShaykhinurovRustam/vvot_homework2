@@ -280,7 +280,7 @@ resource "yandex_function" "bot" {
   runtime = "python39"
   entrypoint = "main.handler"
   memory = 128
-  execution_timeout = 30
+  execution_timeout = 10
   environment = {
     "TELEGRAM_API_KEY" = var.telegram_api_key,
     "DB_URL" = yandex_ydb_database_serverless.database.ydb_full_endpoint,

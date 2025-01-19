@@ -39,13 +39,11 @@ def handler(event, context):
     for record in event['messages']:
         task = json.loads(record['details']['message']['body'])
         original_key = task['original_photo_key']
-        # top, right, bottom, left = task['face_coordinates']
+        left, top, right, bottom = task['face_coordinates']
 
         response = s3.get_object(Bucket=PHOTOS_BUCKET_NAME, Key=original_key)
         image = Image.open(BytesIO(response['Body'].read()))
-
-        # cropped_face = image.crop((left, top, right, bottom))
-        cropped_face = image
+        cropped_face = image.crop((left, top, right, bottom))
 
         face_key = f'{uuid.uuid4()}.jpg'
         cropped_face.save(fp=f'/function/storage/faces/{face_key}', format='JPEG')

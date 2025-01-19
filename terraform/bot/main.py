@@ -30,16 +30,15 @@ async def get_face(message: types.Message):
     driver = ydb.Driver(driver_config)
     try:
         driver.wait(timeout=5)
-        
         session = driver.table_client.session().create()
         
         query = '''
-        SELECT face_id FROM image_faces LIMIT 1;
+            SELECT face_id FROM image_faces LIMIT 1;
         '''
         result = session.transaction().execute(query, commit_tx=True)
     except Exception as e:
         result = None
-        logging.debug(f'Ошибка подключения к YDB: {e}')
+        logging.error(f'Ошибка подключения к YDB: {e}')
     finally:
         driver.stop()
         
@@ -67,29 +66,24 @@ async def find_faces(message: types.Message):
 
     try:
         driver.wait(timeout=5)
-
-        with driver.table_client.session().create() as session:
-            query = '''
-                DECLARE $face_name AS Utf8;
-                
-                SELECT image_faces.image_id
-                FROM image_faces
-                JOIN face_names ON image_faces.face_id = image_faces.face_id
-                WHERE face_names.face_name = %face_name
-            '''
-            
-            params = {"$face_name": name}
-            
-            results = session.transaction().execute(query, params=params, commit_tx=True)
+        session = driver.table_client.session().create()
+        
+        query = f'''
+            SELECT image_faces.image_id AS image_id
+            FROM image_faces
+            JOIN face_names ON image_faces.face_id = face_names.face_id
+            WHERE face_names.face_name = '{name}';
+        '''
+        results = session.transaction().execute(query, commit_tx=True)
     except Exception as e:
-        logging.debug(f'Ошибка подключения к YDB: {e}')
+        logging.error(f'Ошибка подключения к YDB: {e}')
     finally:
         driver.stop()
 
     if results and results[0].rows:
         for row in results[0].rows:
-            image_id = row["image_id"]
-            photo_url = f'{GATEWAY_URL}?photo={image_id}'
+            image_id = row['image_id'].decode('utf-8')
+            photo_url = f'https://{GATEWAY_URL}?photo={image_id}'
             await message.answer_photo(photo_url)
     else:
         await message.answer(f'Фотографии с именем {name} не найдены.')
