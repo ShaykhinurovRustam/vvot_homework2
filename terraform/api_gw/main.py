@@ -9,7 +9,7 @@ def handler(event, context):
         if not face_key.endswith('.jpg'):
             return {
                 'statusCode': 400,
-                'body': 'Invalid face key',
+                'body': 'Invalid key',
             }
         local_path = f'/function/storage/faces/{face_key}'
         try:
@@ -32,7 +32,7 @@ def handler(event, context):
         if not photo_key.endswith('.jpg'):
             return {
                 'statusCode': 400,
-                'body': 'Invalid photo key',
+                'body': 'Invalid key',
             }
         local_path = f'/function/storage/images/{photo_key}'
         try:

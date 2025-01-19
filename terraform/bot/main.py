@@ -18,9 +18,7 @@ DB_DATABASE = DB_URL[1]
 GATEWAY_URL = os.getenv('GATEWAY_URL')
 
 
-@dp.message_handler(commands=['getface'])
-async def get_face(message: types.Message):
-    
+def get_driver():
     credentials = ydb.iam.MetadataUrlCredentials()
     driver_config = ydb.DriverConfig(
         endpoint=DB_ENDPOINT,
@@ -28,24 +26,39 @@ async def get_face(message: types.Message):
         credentials=credentials
     )
     driver = ydb.Driver(driver_config)
+    driver.wait(timeout=5)
+    
+    return driver
+
+
+@dp.message_handler(commands=['getface'])
+async def get_face(message: types.Message):
+    result = None
+
     try:
-        driver.wait(timeout=5)
+        driver = get_driver()
         session = driver.table_client.session().create()
         
         query = '''
-            SELECT face_id FROM image_faces LIMIT 1;
+            SELECT i.face_id AS face_id
+            FROM image_faces AS i
+            LEFT JOIN face_names AS f ON i.face_id = f.face_id
+            WHERE f.face_id IS NULL
+            LIMIT 1;
         '''
         result = session.transaction().execute(query, commit_tx=True)
     except Exception as e:
-        result = None
         logging.error(f'Ошибка подключения к YDB: {e}')
     finally:
         driver.stop()
         
     if result:
-        face_id = result[0].rows[0]['face_id'].decode('utf-8')
-        photo_url = f'https://{GATEWAY_URL}?face={face_id}'
-        await message.answer_photo(photo_url)
+        try:
+            face_id = result[0].rows[0]['face_id'].decode('utf-8')
+            photo_url = f'https://{GATEWAY_URL}?face={face_id}'
+            await message.answer_photo(photo_url)
+        except:
+            await message.answer('Нет доступных лиц без имени.')
     else:
         await message.answer('Нет доступных лиц без имени.')
 
@@ -53,19 +66,10 @@ async def get_face(message: types.Message):
 @dp.message_handler(commands=['find'])
 async def find_faces(message: types.Message):
     name = message.get_args()
-
-    credentials = ydb.iam.MetadataUrlCredentials()
-    driver_config = ydb.DriverConfig(
-        endpoint=DB_ENDPOINT,
-        database=DB_DATABASE,
-        credentials=credentials
-    )
-    driver = ydb.Driver(driver_config)
-    
     results = None
 
     try:
-        driver.wait(timeout=5)
+        driver = get_driver()
         session = driver.table_client.session().create()
         
         query = f'''
@@ -91,7 +95,40 @@ async def find_faces(message: types.Message):
 
 @dp.message_handler()
 async def default_handler(message: types.Message):
-    await message.answer('Ошибка.')
+    if not message.reply_to_message:
+        await message.answer('Ошибка.')
+        return 
+
+    if not message.reply_to_message.photo:
+        await message.answer('Ошибка.')
+        return 
+    
+    driver = get_driver()
+    session = driver.table_client.session().create()
+    
+    query = '''
+        SELECT i.face_id AS face_id
+        FROM image_faces AS i
+        LEFT JOIN face_names AS f ON i.face_id = f.face_id
+        WHERE f.face_id IS NULL
+        LIMIT 1;
+    '''
+    result = session.transaction().execute(query, commit_tx=True)
+    
+    if not result:
+        await message.answer('Ошибка.')
+        return
+
+    try:
+        face_id = result[0].rows[0]['face_id'].decode('utf-8')
+        name = message.text
+        query = f'''
+            INSERT INTO face_names (face_id, face_name)
+            VALUES ('{face_id}', '{name}');
+        '''
+        session.transaction().execute(query, commit_tx=True)
+    except:
+        await message.answer('Ошибка.')
 
 
 async def process_update(update_data: dict):

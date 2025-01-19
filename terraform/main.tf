@@ -50,7 +50,7 @@ resource "archive_file" "face-detection" {
 }
 
 resource "yandex_storage_bucket" "photo-bucket" {
-  bucket = "vvot17-photo"
+  bucket = "vvot17-photos"
   folder_id = var.folder_id
 }
 
@@ -82,8 +82,8 @@ resource "yandex_function" "face-detection" {
   }
 }
 
-resource "yandex_function_trigger" "input_trigger" {
-  name = "vvot17-photo"
+resource "yandex_function_trigger" "photo_trigger" {
+  name = "vvot17-photos"
   function {
     id = yandex_function.face-detection.id
     service_account_id = yandex_iam_service_account.service-account-tg.id
@@ -170,11 +170,7 @@ resource "yandex_function_trigger" "task_trigger" {
 }
 
 resource "yandex_api_gateway" "api-gateway" {
-  name        = "vvot17-apigw"
-  labels = {
-    label = "label"
-    empty-label = ""
-  }
+  name = "vvot17-apigw"
   spec = <<-EOT
     openapi: "3.0.0"
     info:
@@ -189,19 +185,35 @@ resource "yandex_api_gateway" "api-gateway" {
               required: false
               schema:
                 type: string
-            - name: image
+                example: "face1.jpg"
+            - name: photo
               in: query
               required: false
               schema:
                 type: string
+                example: "photo1.jpg"
           responses:
             "200":
-              description: File
+              description: Изображение
               content:
                 image/jpeg:
                   schema:
                     type: string
                     format: binary
+            "400":
+              description: Неверный запрос
+              content:
+                text/plain:
+                  schema:
+                    type: string
+                    example: "Invalid key"
+            "404":
+              description: Изображение не найдено
+              content:
+                text/plain:
+                  schema:
+                    type: string
+                    example: "Not Found"
           x-yc-apigateway-integration:
             type: cloud_functions
             payload_format_version: '0.1'
@@ -306,7 +318,7 @@ resource "yandex_function" "bot" {
 }
 
 resource "yandex_function" "api-gw" {
-  name = "vvot17-api-gw"
+  name = "vvot17-apigw"
   user_hash = archive_file.gw.output_sha256
   runtime = "python39"
   entrypoint = "main.handler"
