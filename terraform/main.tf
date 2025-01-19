@@ -154,7 +154,7 @@ resource "yandex_function" "face-cut" {
   }
 }
 
-resource "yandex_function_trigger" "ymq_trigger" {
+resource "yandex_function_trigger" "task_trigger" {
   name = "vvot17-task"
 
   message_queue {
