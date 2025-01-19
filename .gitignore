@@ -1,0 +1,6 @@
+*.hcl
+*.info
+*.tfstate
+*.backup
+*.zip
+__pycache__/
