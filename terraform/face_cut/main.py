@@ -52,18 +52,11 @@ def handler(event, context):
         
         session = driver.table_client.session().create()
 
-        query = '''
-            DECLARE $face_id AS Utf8;
-            DECLARE $image_id AS Utf8;
-
+        query = f'''
             INSERT INTO image_faces (face_id, image_id)
-            VALUES ($face_id, $image_id);
+            VALUES ('{face_key}', '{original_key}');
         '''
-        params = {
-            "$face_id": face_key,
-            "$image_id": original_key
-        }
-        session.transaction().execute(query, parameters=params, commit_tx=True)
+        session.transaction().execute(query, commit_tx=True)
         
         driver.stop()
 
