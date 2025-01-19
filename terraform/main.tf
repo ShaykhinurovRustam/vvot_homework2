@@ -104,7 +104,7 @@ resource "yandex_message_queue" "task_queue" {
   name = "vvot17-task"
   visibility_timeout_seconds = 600
   receive_wait_time_seconds = 20
-  message_retention_seconds = 1209600
+  message_retention_seconds = 600
   access_key = yandex_iam_service_account_static_access_key.static-access-key.access_key
   secret_key = yandex_iam_service_account_static_access_key.static-access-key.secret_key
 }
